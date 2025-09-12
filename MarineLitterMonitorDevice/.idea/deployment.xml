@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="Echo (7b67f088-0e71-4940-b5d9-8652f62785f0)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/Documents/Projects/CourseDesign/MarineLitterMonitor/cpp_source" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug" />
+            <excludedPath local="true" path="$PROJECT_DIR$/../cpp_lib" />
+            <excludedPath local="true" path="$PROJECT_DIR$/asd" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-remote" />
+            <excludedPath local="true" path="$PROJECT_DIR$/./asd" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
