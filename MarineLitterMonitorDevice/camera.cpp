@@ -1,0 +1,87 @@
+#include "camera.h"
+
+#include <iostream>
+#include <opencv2/opencv.hpp>
+
+
+// 使用静态变量，这样摄像头对象在DLL加载期间只初始化一次
+static cv::VideoCapture cap;
+static int frame_width = 0;
+static int frame_height = 0;
+
+bool InitializeCamera(const int width, const int height)
+{
+    if (cap.isOpened())
+    {
+        cap.release();
+    }
+    // 0 代表默认摄像头
+    cap.open(0, cv::CAP_ANY);
+    if (!cap.isOpened())
+    {
+        std::cerr << "[C++] Error: cap.isOpened() returned false. Failed to open camera." << std::endl;
+        return false;
+    }
+    const auto set_w = cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
+    const auto set_h = cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+    if (!set_w || !set_h)
+    {
+        std::cout <<
+            "[C++] Warning: cap.set() for resolution returned false. The camera may not support this resolution." <<
+            std::endl;
+    }
+
+    frame_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
+    frame_height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
+    std::cout << "[C++] Info: Current frame width: " << frame_width << ", height: " << frame_height << "." << std::endl;
+
+    return true;
+}
+
+int GetWebcamFrame(unsigned char* buffer, const int bufferSize, int* outWidth, int* outHeight, int* outChannels)
+{
+    if (!cap.isOpened())
+    {
+        return 0;
+    }
+
+    cv::Mat frame;
+    cap.read(frame);
+
+    if (frame.empty())
+    {
+        return 0;
+    }
+
+    // **关键步骤**: OpenCV默认读取的格式是BGR，而大多数环境需要RGB。
+    // 我们在这里进行转换。
+    cv::Mat rgbFrame;
+    cv::cvtColor(frame, rgbFrame, cv::COLOR_BGR2RGB);
+
+    int channels = rgbFrame.channels();
+    int requiredSize = rgbFrame.rows * rgbFrame.cols * channels;
+
+    // 检查C#提供的缓冲区大小是否足够
+    if (bufferSize < requiredSize)
+    {
+        return 0; // 缓冲区太小
+    }
+
+    // 将图像数据复制到C#传入的缓冲区
+    memcpy(buffer, rgbFrame.data, requiredSize);
+
+    // 通过指针返回图像的实际尺寸和通道数
+    *outWidth = rgbFrame.cols;
+    *outHeight = rgbFrame.rows;
+    *outChannels = channels;
+
+    return requiredSize;
+}
+
+void ReleaseCamera()
+{
+    if (cap.isOpened())
+    {
+        cap.release();
+    }
+}

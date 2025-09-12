@@ -3,7 +3,20 @@ project(MarineLitterMonitorDevice)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_library(MarineLitterMonitorDevice SHARED library.cpp)
+# 1. 找到 pkg-config 工具
+find_package(PkgConfig REQUIRED)
+
+# 2. 使用 pkg-config 来查找 OpenCV 4
+#    这会创建一些变量，如 OpenCV_INCLUDE_DIRS 和 OpenCV_LIBRARIES
+pkg_check_modules(OpenCV REQUIRED opencv4)
+
+add_library(MarineLitterMonitorDevice SHARED camera.cpp)
+
+# 将找到的头文件路径添加到你的目标
+target_include_directories(MarineLitterMonitorDevice PUBLIC ${OpenCV_INCLUDE_DIRS})
+
+# 将找到的库链接到你的目标
+target_link_libraries(MarineLitterMonitorDevice PUBLIC ${OpenCV_LIBRARIES})
 
 # CMAKE_SOURCE_DIR 是你项目根目录的绝对路径 (包含CMakeLists.txt的目录)
 # 我们用它来构造一个相对于项目根目录的路径
