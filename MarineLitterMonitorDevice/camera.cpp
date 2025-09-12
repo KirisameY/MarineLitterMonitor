@@ -16,7 +16,7 @@ bool InitializeCamera(const int width, const int height)
         cap.release();
     }
     // 0 代表默认摄像头
-    cap.open(0, cv::CAP_ANY);
+    cap.open(0, cv::CAP_V4L2);
     if (!cap.isOpened())
     {
         std::cerr << "[C++] Error: cap.isOpened() returned false. Failed to open camera." << std::endl;
@@ -38,7 +38,9 @@ bool InitializeCamera(const int width, const int height)
     return true;
 }
 
-int GetWebcamFrame(unsigned char* buffer, const int bufferSize, int* outWidth, int* outHeight, int* outChannels)
+int GetWebcamFrame(unsigned char* buffer, const int bufferSize,
+                   int* outWidth, int* outHeight, int* outChannels,
+                   const bool toRgb)
 {
     if (!cap.isOpened())
     {
@@ -53,13 +55,17 @@ int GetWebcamFrame(unsigned char* buffer, const int bufferSize, int* outWidth, i
         return 0;
     }
 
-    // **关键步骤**: OpenCV默认读取的格式是BGR，而大多数环境需要RGB。
+    // OpenCV默认读取的格式是BGR，而大多数环境需要RGB。
     // 我们在这里进行转换。
-    cv::Mat rgbFrame;
-    cv::cvtColor(frame, rgbFrame, cv::COLOR_BGR2RGB);
+    if (toRgb)
+    {
+        cv::Mat rgbFrame;
+        cvtColor(frame, rgbFrame, cv::COLOR_BGR2RGB);
+        frame = rgbFrame;
+    }
 
-    int channels = rgbFrame.channels();
-    int requiredSize = rgbFrame.rows * rgbFrame.cols * channels;
+    const int channels = frame.channels();
+    const int requiredSize = frame.rows * frame.cols * channels;
 
     // 检查C#提供的缓冲区大小是否足够
     if (bufferSize < requiredSize)
@@ -68,11 +74,11 @@ int GetWebcamFrame(unsigned char* buffer, const int bufferSize, int* outWidth, i
     }
 
     // 将图像数据复制到C#传入的缓冲区
-    memcpy(buffer, rgbFrame.data, requiredSize);
+    memcpy(buffer, frame.data, requiredSize);
 
     // 通过指针返回图像的实际尺寸和通道数
-    *outWidth = rgbFrame.cols;
-    *outHeight = rgbFrame.rows;
+    *outWidth = frame.cols;
+    *outHeight = frame.rows;
     *outChannels = channels;
 
     return requiredSize;

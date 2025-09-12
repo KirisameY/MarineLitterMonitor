@@ -12,11 +12,9 @@ public static partial class CameraInteractions
 
     [LibraryImport(DllName, EntryPoint = "GetWebcamFrame")]
     public static partial int GetWebcamFrame(
-        [Out] byte[] buffer, // [Out] 表示数据从native流向managed
-        int bufferSize,
-        out int outWidth,
-        out int outHeight,
-        out int outChannels);
+        [Out] byte[] buffer, int bufferSize,
+        out int outWidth, out int outHeight, out int outChannels,
+        [MarshalAs(UnmanagedType.Bool)] bool toRgb);
 
     [LibraryImport(DllName, EntryPoint = "ReleaseCamera")]
     public static partial void ReleaseCamera();

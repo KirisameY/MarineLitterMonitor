@@ -1,4 +1,10 @@
-﻿using MarineLitterMonitor.Server.ExternImport;
+﻿using System.Diagnostics;
+
+using MarineLitterMonitor.Server.ExternImport;
+
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.ColorSpaces;
+using SixLabors.ImageSharp.PixelFormats;
 
 void Exit()
 {
@@ -18,13 +24,18 @@ if (!CameraInteractions.InitializeCamera(width, height))
     Console.WriteLine("Error: camera initialize failed.");
     Exit();
 }
+Console.WriteLine("Camera initialized.");
 
 try
 {
     byte[] buffer = new byte[width * height * 3];
-    var bytes = CameraInteractions.GetWebcamFrame(buffer, buffer.Length, out int outWidth, out int outHeight, out int channels);
+    // this takes about 4ms
+    var bytes = CameraInteractions.GetWebcamFrame(buffer, buffer.Length, out int outWidth, out int outHeight, out int channels, false);
     Console.WriteLine($"out: width = {outWidth}, height = {outHeight}, channels = {channels}");
     Console.WriteLine($"read bytes: {bytes}");
+
+    var img = Image.LoadPixelData<Bgr24>(buffer, width, height);
+    img.Save("./save.png");
 }
 finally
 {
