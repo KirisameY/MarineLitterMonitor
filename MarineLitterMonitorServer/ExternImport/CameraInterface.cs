@@ -25,7 +25,7 @@ internal sealed partial class CameraInterface : IDisposable
     [return: MarshalAs(UnmanagedType.I1)]
     private static partial bool GetWebcamFrameAndNormalizedNative(
         [Out] byte[] buffer, int bufferSize, out int outSize,
-        [Out] byte[] nBuffer, int nBufferSize, out int nOutSize,
+        [Out] float[] nBuffer, int nBufferSize, out int nOutSize,
         out int outWidth, out int outHeight);
 
     [LibraryImport(LibName, EntryPoint = "release_camera")]
@@ -87,11 +87,11 @@ internal sealed partial class CameraInterface : IDisposable
         return result;
     }
 
-    public (int Size, int NSize) GetFrameAndNormalized([Out] byte[] buffer, [Out] byte[] nBuffer)
+    public (int Size, int NSize) GetFrameAndNormalized([Out] byte[] buffer, [Out] float[] nBuffer)
     {
         ObjectDisposedException.ThrowIf(Disposed, this);
         var result = GetWebcamFrameAndNormalizedNative(buffer, buffer.Length, out var outSize,
-                                                       nBuffer, nBuffer.Length, out var nOutSize,
+                                                       nBuffer, nBuffer.Length * 4, out var nOutSize,
                                                        out var outWidth, out var outHeight);
         if ((outWidth, outHeight) != Size)
         {

@@ -65,6 +65,13 @@ int get_webcam_frame(unsigned char* buffer, const int buffer_size,
         return 0;
     }
 
+    {
+        // bgr转换为rgb
+        cv::Mat rgb;
+        cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
+        frame = rgb;
+    }
+
     const int channels = frame.channels();
     const int requiredSize = frame.rows * frame.cols * channels;
 
@@ -103,6 +110,13 @@ bool get_webcam_frame_and_normalized(unsigned char* buffer, const int buffer_siz
     const int channels = frame.channels();
     if (channels != 3) return false;
 
+    {
+        // bgr转换为rgb
+        cv::Mat rgb;
+        cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
+        frame = rgb;
+    }
+
     const int requiredSize = frame.rows * frame.cols * channels;
     const int n_requiredSize = requiredSize * 4;
 
@@ -115,7 +129,7 @@ bool get_webcam_frame_and_normalized(unsigned char* buffer, const int buffer_siz
     // 转换格式
     cv::Mat blob;
     cv::dnn::blobFromImage(frame, blob, 1.0 / 255.0, cv::Size(frame.cols, frame.rows),
-                           cv::Scalar(), true, false,CV_32F);
+                           cv::Scalar(), false, false,CV_32F);
 
     // 将图像数据复制到C#传入的缓冲区
     memcpy(buffer, frame.data, requiredSize);
