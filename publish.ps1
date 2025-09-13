@@ -21,7 +21,7 @@ $remotePassword = "echo13234"    # SSH 登录密码 (!!! 不安全，仅用于�
 
 # --- 目录设置 ---
 $remoteDir = "/home/ReEd/Documents/Projects/CourseDesign/MarineLitterMonitor/dotnet-app"  # 文件要上传到的远程服务器上的绝对路径
-$localPublishDir = "MarineLitterMonitorServer/bin/Release/net9.0/publish/" # 本地 publish 文件夹的相对路径
+$localPublishDir = "MarineLitterMonitorServer/bin/Release/net9.0/linux-arm64/publish/" # 本地 publish 文件夹的相对路径
                                                  # (请根据你的项目配置修改, 比如 net7.0, Debug/Release等)
 
 # ===================================================================

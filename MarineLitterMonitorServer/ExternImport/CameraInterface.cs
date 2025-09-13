@@ -16,12 +16,17 @@ internal sealed partial class CameraInterface : IDisposable
     [return: MarshalAs(UnmanagedType.I1)]
     private static partial bool SetCameraSizeNative(int width, int height, out int finalWidth, out int finalHeight);
 
-
     [LibraryImport(LibName, EntryPoint = "get_webcam_frame")]
     private static partial int GetWebcamFrameNative(
         [Out] byte[] buffer, int bufferSize,
-        out int outWidth, out int outHeight, out int outChannels,
-        [MarshalAs(UnmanagedType.I1)] bool toRgb);
+        out int outWidth, out int outHeight, out int outChannels);
+
+    [LibraryImport(LibName, EntryPoint = "get_webcam_frame_and_normalized")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static partial bool GetWebcamFrameAndNormalizedNative(
+        [Out] byte[] buffer, int bufferSize, out int outSize,
+        [Out] byte[] nBuffer, int nBufferSize, out int nOutSize,
+        out int outWidth, out int outHeight);
 
     [LibraryImport(LibName, EntryPoint = "release_camera")]
     private static partial void ReleaseCameraNative();
@@ -66,10 +71,10 @@ internal sealed partial class CameraInterface : IDisposable
         return result;
     }
 
-    public int GetFrame([Out] byte[] buffer, bool toRgb = true)
+    public int GetFrame([Out] byte[] buffer)
     {
         ObjectDisposedException.ThrowIf(Disposed, this);
-        var result = GetWebcamFrameNative(buffer, buffer.Length, out var outWidth, out var outHeight, out var outChannels, toRgb);
+        var result = GetWebcamFrameNative(buffer, buffer.Length, out var outWidth, out var outHeight, out var outChannels);
         if ((outWidth, outHeight) != Size)
         {
             throw new UnexpectedFrameParameterException($"Unexpected out size: {outWidth}, {outHeight}. (expected: {Size.Width}, {Size.Height})");
@@ -80,6 +85,20 @@ internal sealed partial class CameraInterface : IDisposable
         }
 
         return result;
+    }
+
+    public (int Size, int NSize) GetFrameAndNormalized([Out] byte[] buffer, [Out] byte[] nBuffer)
+    {
+        ObjectDisposedException.ThrowIf(Disposed, this);
+        var result = GetWebcamFrameAndNormalizedNative(buffer, buffer.Length, out var outSize,
+                                                       nBuffer, nBuffer.Length, out var nOutSize,
+                                                       out var outWidth, out var outHeight);
+        if ((outWidth, outHeight) != Size)
+        {
+            throw new UnexpectedFrameParameterException($"Unexpected out size: {outWidth}, {outHeight}. (expected: {Size.Width}, {Size.Height})");
+        }
+
+        return (outSize, nOutSize);
     }
 
 

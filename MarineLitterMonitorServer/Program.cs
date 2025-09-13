@@ -44,23 +44,30 @@ Console.WriteLine("Camera initialized.");
 #endregion
 
 
-using var camera = cameraInit;
-
-byte[] buffer = new byte[width * height * 3];
-// this takes about 4ms
-var bytes = camera.GetFrame(buffer, false);
-Console.WriteLine($"read bytes: {bytes}");
-
-var img = Image.LoadPixelData<Bgr24>(buffer, width, height);
-img.Save("./save.png");
-
-using (var gpioOut = GpioInterface.GetInstance(outputPin))
+try
 {
-    gpioOut.Write(true);
-    Console.WriteLine("Any key to stop");
-    Console.ReadKey();
-    gpioOut.Write(false);
-}
+    using var camera = cameraInit;
 
-BeforeExit();
+    byte[] buffer = new byte[width * height * 3];
+    byte[] nBuffer = new byte[width * height * 3 * 4];
+    // this takes about 4ms
+    var (bytes, nBytes) = camera.GetFrameAndNormalized(buffer, nBuffer);
+    Console.WriteLine($"read bytes: {bytes}");
+    Console.WriteLine($"read nBytes: {nBytes}");
+
+    var img = Image.LoadPixelData<Bgr24>(buffer, width, height);
+    img.Save("./save.png");
+
+    // using (var gpioOut = GpioInterface.GetInstance(outputPin))
+    // {
+    //     gpioOut.Write(true);
+    //     Console.WriteLine("Any key to stop");
+    //     Console.ReadKey();
+    //     gpioOut.Write(false);
+    // }
+}
+finally
+{
+    BeforeExit();
+}
 return 0;

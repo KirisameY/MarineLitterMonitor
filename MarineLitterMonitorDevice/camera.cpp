@@ -43,14 +43,14 @@ bool set_camera_size(const int width, const int height, int* final_width, int* f
 
     *final_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
     *final_height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
-    std::cout << "[C++] Info: Current frame width: " << *final_width << ", height: " << *final_height << "." << std::endl;
+    std::cout << "[C++] Info: Current frame width: " << *final_width << ", height: " << *final_height << "." <<
+        std::endl;
 
     return result;
 }
 
 int get_webcam_frame(unsigned char* buffer, const int buffer_size,
-                   int* out_width, int* out_height, int* out_channels,
-                   const bool to_rgb)
+                     int* out_width, int* out_height, int* out_channels)
 {
     if (!cap.isOpened())
     {
@@ -63,15 +63,6 @@ int get_webcam_frame(unsigned char* buffer, const int buffer_size,
     if (frame.empty())
     {
         return 0;
-    }
-
-    // OpenCV默认读取的格式是BGR，而大多数环境需要RGB。
-    // 我们在这里进行转换。
-    if (to_rgb)
-    {
-        cv::Mat rgbFrame;
-        cvtColor(frame, rgbFrame, cv::COLOR_BGR2RGB);
-        frame = rgbFrame;
     }
 
     const int channels = frame.channels();
@@ -93,6 +84,53 @@ int get_webcam_frame(unsigned char* buffer, const int buffer_size,
 
     return requiredSize;
 }
+
+
+bool get_webcam_frame_and_normalized(unsigned char* buffer, const int buffer_size, int* out_size,
+                                     unsigned char* n_buffer, const int n_buffer_size, int* n_out_size,
+                                     int* out_width, int* out_height)
+{
+    if (!cap.isOpened())
+    {
+        return false;
+    }
+
+    cv::Mat frame;
+    cap.read(frame);
+
+    if (frame.empty()) return false;
+
+    const int channels = frame.channels();
+    if (channels != 3) return false;
+
+    const int requiredSize = frame.rows * frame.cols * channels;
+    const int n_requiredSize = requiredSize * 4;
+
+    // 检查外部提供的缓冲区大小是否足够
+    if (buffer_size < requiredSize || n_buffer_size < n_requiredSize)
+    {
+        return false; // 缓冲区太小
+    }
+
+    // 转换格式
+    cv::Mat blob;
+    cv::dnn::blobFromImage(frame, blob, 1.0 / 255.0, cv::Size(frame.cols, frame.rows),
+                           cv::Scalar(), true, false,CV_32F);
+
+    // 将图像数据复制到C#传入的缓冲区
+    memcpy(buffer, frame.data, requiredSize);
+    memcpy(n_buffer, blob.data, n_requiredSize);
+
+    // 通过指针返回图像的实际尺寸和通道数
+    *out_width = frame.cols;
+    *out_height = frame.rows;
+
+    *out_size = requiredSize;
+    *n_out_size = n_requiredSize;
+
+    return true;
+}
+
 
 void release_camera()
 {
