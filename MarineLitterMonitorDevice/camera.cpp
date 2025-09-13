@@ -7,7 +7,7 @@
 // 使用静态变量，这样摄像头对象在DLL加载期间只初始化一次
 static cv::VideoCapture cap;
 
-bool InitializeCamera(int* width, int* height)
+bool initialize_camera(int* width, int* height)
 {
     if (cap.isOpened())
     {
@@ -27,7 +27,7 @@ bool InitializeCamera(int* width, int* height)
     return true;
 }
 
-bool SetCameraSize(const int width, const int height, int* finalWidth, int* finalHeight)
+bool set_camera_size(const int width, const int height, int* final_width, int* final_height)
 {
     const auto set_w = cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
     const auto set_h = cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
@@ -41,16 +41,16 @@ bool SetCameraSize(const int width, const int height, int* finalWidth, int* fina
         result = false;
     }
 
-    *finalWidth = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
-    *finalHeight = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
-    std::cout << "[C++] Info: Current frame width: " << finalWidth << ", height: " << finalHeight << "." << std::endl;
+    *final_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
+    *final_height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
+    std::cout << "[C++] Info: Current frame width: " << *final_width << ", height: " << *final_height << "." << std::endl;
 
     return result;
 }
 
-int GetWebcamFrame(unsigned char* buffer, const int bufferSize,
-                   int* outWidth, int* outHeight, int* outChannels,
-                   const bool toRgb)
+int get_webcam_frame(unsigned char* buffer, const int buffer_size,
+                   int* out_width, int* out_height, int* out_channels,
+                   const bool to_rgb)
 {
     if (!cap.isOpened())
     {
@@ -67,7 +67,7 @@ int GetWebcamFrame(unsigned char* buffer, const int bufferSize,
 
     // OpenCV默认读取的格式是BGR，而大多数环境需要RGB。
     // 我们在这里进行转换。
-    if (toRgb)
+    if (to_rgb)
     {
         cv::Mat rgbFrame;
         cvtColor(frame, rgbFrame, cv::COLOR_BGR2RGB);
@@ -78,7 +78,7 @@ int GetWebcamFrame(unsigned char* buffer, const int bufferSize,
     const int requiredSize = frame.rows * frame.cols * channels;
 
     // 检查C#提供的缓冲区大小是否足够
-    if (bufferSize < requiredSize)
+    if (buffer_size < requiredSize)
     {
         return 0; // 缓冲区太小
     }
@@ -87,14 +87,14 @@ int GetWebcamFrame(unsigned char* buffer, const int bufferSize,
     memcpy(buffer, frame.data, requiredSize);
 
     // 通过指针返回图像的实际尺寸和通道数
-    *outWidth = frame.cols;
-    *outHeight = frame.rows;
-    *outChannels = channels;
+    *out_width = frame.cols;
+    *out_height = frame.rows;
+    *out_channels = channels;
 
     return requiredSize;
 }
 
-void ReleaseCamera()
+void release_camera()
 {
     if (cap.isOpened())
     {

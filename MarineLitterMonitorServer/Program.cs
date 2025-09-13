@@ -1,21 +1,18 @@
-﻿using System.Diagnostics;
-
-using MarineLitterMonitor.Server.ExternImport;
+﻿using MarineLitterMonitor.Server.ExternImport;
 
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.ColorSpaces;
 using SixLabors.ImageSharp.PixelFormats;
 
-void Exit()
+void BeforeExit()
 {
     Console.WriteLine("Press any key to continue...");
     Console.ReadKey();
     Console.WriteLine();
-    Environment.Exit(0);
 }
 
 const int width = 640;
 const int height = 480;
+const byte outputPin = 24;
 
 
 Console.WriteLine("Hello, world!");
@@ -31,15 +28,15 @@ try
     if (cameraInit.Size != (width, height))
     {
         Console.WriteLine($"Error: camera size is {cameraInit.Size}. (expected: {(width, height)})");
-        Exit();
-        return;
+        BeforeExit();
+        return 0;
     }
 }
 catch (CameraInterface.CameraInitializationException)
 {
     Console.WriteLine("Error: camera initialize failed.");
-    Exit();
-    return;
+    BeforeExit();
+    return 0;
 }
 
 Console.WriteLine("Camera initialized.");
@@ -47,19 +44,23 @@ Console.WriteLine("Camera initialized.");
 #endregion
 
 
-try
-{
-    using var camera = cameraInit;
+using var camera = cameraInit;
 
-    byte[] buffer = new byte[width * height * 3];
-    // this takes about 4ms
-    var bytes = camera.GetFrame(buffer, false);
-    Console.WriteLine($"read bytes: {bytes}");
+byte[] buffer = new byte[width * height * 3];
+// this takes about 4ms
+var bytes = camera.GetFrame(buffer, false);
+Console.WriteLine($"read bytes: {bytes}");
 
-    var img = Image.LoadPixelData<Bgr24>(buffer, width, height);
-    img.Save("./save.png");
-}
-finally
+var img = Image.LoadPixelData<Bgr24>(buffer, width, height);
+img.Save("./save.png");
+
+using (var gpioOut = GpioInterface.GetInstance(outputPin))
 {
-    Exit();
+    gpioOut.Write(true);
+    Console.WriteLine("Any key to stop");
+    Console.ReadKey();
+    gpioOut.Write(false);
 }
+
+BeforeExit();
+return 0;

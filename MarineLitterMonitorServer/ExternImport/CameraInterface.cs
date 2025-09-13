@@ -2,34 +2,35 @@
 
 namespace MarineLitterMonitor.Server.ExternImport;
 
-internal partial class CameraInterface : IDisposable
+internal sealed partial class CameraInterface : IDisposable
 {
     #region Import
 
     private const string LibName = "MarineLitterMonitorDevice";
 
-    [LibraryImport(LibName, EntryPoint = "InitializeCamera")]
-    [return: MarshalAs(UnmanagedType.Bool)]
+    [LibraryImport(LibName, EntryPoint = "initialize_camera")]
+    [return: MarshalAs(UnmanagedType.I1)]
     private static partial bool InitializeCameraNative(out int width, out int height);
 
-    [LibraryImport(LibName, EntryPoint = "SetCameraSize")]
-    [return: MarshalAs(UnmanagedType.Bool)]
+    [LibraryImport(LibName, EntryPoint = "set_camera_size")]
+    [return: MarshalAs(UnmanagedType.I1)]
     private static partial bool SetCameraSizeNative(int width, int height, out int finalWidth, out int finalHeight);
 
 
-    [LibraryImport(LibName, EntryPoint = "GetWebcamFrame")]
+    [LibraryImport(LibName, EntryPoint = "get_webcam_frame")]
     private static partial int GetWebcamFrameNative(
         [Out] byte[] buffer, int bufferSize,
         out int outWidth, out int outHeight, out int outChannels,
-        [MarshalAs(UnmanagedType.Bool)] bool toRgb);
+        [MarshalAs(UnmanagedType.I1)] bool toRgb);
 
-    [LibraryImport(LibName, EntryPoint = "ReleaseCamera")]
+    [LibraryImport(LibName, EntryPoint = "release_camera")]
     private static partial void ReleaseCameraNative();
 
     #endregion
 
 
-    // Singleton & Dispose
+    #region Singleton & Dispose
+
     private CameraInterface()
     {
         if (!InitializeCameraNative(out int width, out int height)) throw new CameraInitializationException();
@@ -48,7 +49,10 @@ internal partial class CameraInterface : IDisposable
 
         Disposed = true;
         ReleaseCameraNative();
+        _instance = null;
     }
+
+    #endregion
 
 
     // Instance Api
@@ -56,6 +60,7 @@ internal partial class CameraInterface : IDisposable
 
     public bool SetSize(int width, int height)
     {
+        ObjectDisposedException.ThrowIf(Disposed, this);
         var result = SetCameraSizeNative(width, height, out int finalWidth, out int finalHeight);
         Size = (finalWidth, finalHeight);
         return result;
@@ -63,6 +68,7 @@ internal partial class CameraInterface : IDisposable
 
     public int GetFrame([Out] byte[] buffer, bool toRgb = true)
     {
+        ObjectDisposedException.ThrowIf(Disposed, this);
         var result = GetWebcamFrameNative(buffer, buffer.Length, out var outWidth, out var outHeight, out var outChannels, toRgb);
         if ((outWidth, outHeight) != Size)
         {

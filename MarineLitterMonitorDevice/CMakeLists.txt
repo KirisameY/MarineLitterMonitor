@@ -10,7 +10,11 @@ find_package(PkgConfig REQUIRED)
 #    这会创建一些变量，如 OpenCV_INCLUDE_DIRS 和 OpenCV_LIBRARIES
 pkg_check_modules(OpenCV REQUIRED opencv4)
 
-add_library(MarineLitterMonitorDevice SHARED camera.cpp)
+add_library(MarineLitterMonitorDevice SHARED
+        camera.cpp
+        camera.h
+        gpio.cpp
+        gpio.h)
 
 # 将找到的头文件路径添加到你的目标
 target_include_directories(MarineLitterMonitorDevice PUBLIC ${OpenCV_INCLUDE_DIRS})
