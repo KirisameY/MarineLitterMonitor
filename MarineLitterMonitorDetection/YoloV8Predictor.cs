@@ -1,21 +1,57 @@
-﻿using Microsoft.ML.OnnxRuntime;
+﻿using System.Collections.Immutable;
+
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
+using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-
 using SixLabors.ImageSharp.Drawing.Processing;
 
 namespace MarineLitterMonitorDetection;
 
-public class YoloV8Predictor : IDisposable
+public class YoloV8Predictor(InferenceSession session, IEnumerable<string> labels, Font? font = null) : IDisposable
 {
-    private readonly InferenceSession _session;
-    private readonly bool _shouldDisposeSession;
-    private readonly string[] _labels;
-    private readonly int _modelWidth;
-    private readonly int _modelHeight;
+    #region Initialize & Dispose
+
+    public YoloV8Predictor(string modelPath, IEnumerable<string> labels, string? fontPath) : this(CreateSession(modelPath), labels, CreateFont(fontPath))
+    {
+        _shouldDisposeSession = true;
+    }
+
+    private static InferenceSession CreateSession(string modelPath) => new(modelPath, new SessionOptions());
+
+    private static Font? CreateFont(string? fontPath)
+    {
+        if (fontPath is null) return null;
+        if (!File.Exists(fontPath)) return null;
+
+        var fontCollection = new FontCollection();
+        var fontFamily = fontCollection.Add(fontPath);
+        return fontFamily.CreateFont(14, FontStyle.Regular);
+    }
+
+    public bool Disposed { get; private set; } = false;
+
+    public void Dispose()
+    {
+        if (Disposed) return;
+        Disposed = true;
+        if (_shouldDisposeSession)
+        {
+            session.Dispose();
+        }
+        GC.SuppressFinalize(this);
+    }
+
+    #endregion
+
+
+    private readonly ImmutableArray<string> _labels = labels.ToImmutableArray();
+    private readonly bool _shouldDisposeSession = false;
+    // private readonly int _modelWidth = session.InputMetadata["images"].Dimensions[3];
+    // private readonly int _modelHeight = session.InputMetadata["images"].Dimensions[2];
 
     /// <summary>
     /// 获取或设置用于过滤检测结果的置信度阈值。
@@ -28,59 +64,20 @@ public class YoloV8Predictor : IDisposable
     public float NmsThreshold { get; set; } = 0.5f;
 
     /// <summary>
-    /// 通过模型文件路径初始化YOLOv8预测器。
-    /// </summary>
-    /// <param name="modelPath">ONNX模型文件的路径。</param>
-    /// <param name="labels">模型训练时使用的类别标签数组。</param>
-    /// <param name="useGpu">是否尝试使用GPU进行推理。</param>
-    public YoloV8Predictor(string modelPath, string[] labels, bool useGpu = false)
-    {
-        var sessionOptions = new SessionOptions();
-        if (useGpu)
-        {
-            // 根据你的环境配置，可能需要 CUDAProviderOptions 或其他
-            sessionOptions.AppendExecutionProvider_CUDA();
-        }
-        _session              = new InferenceSession(modelPath, sessionOptions);
-        _shouldDisposeSession = true;
-        _labels               = labels;
-
-        // 从模型元数据中获取输入维度
-        var inputMetadata = _session.InputMetadata["images"];
-        _modelWidth  = inputMetadata.Dimensions[3];
-        _modelHeight = inputMetadata.Dimensions[2];
-    }
-
-    /// <summary>
-    /// 使用一个已存在的InferenceSession实例初始化YOLOv8预测器。
-    /// </summary>
-    /// <param name="session">要使用的InferenceSession实例。</param>
-    /// <param name="labels">模型训练时使用的类别标签数组。</param>
-    /// <remarks>当使用此构造函数时，该类不会在Dispose时释放传入的session。</remarks>
-    public YoloV8Predictor(InferenceSession session, string[] labels)
-    {
-        _session              = session;
-        _shouldDisposeSession = false;
-        _labels               = labels;
-
-        var inputMetadata = _session.InputMetadata["images"];
-        _modelWidth  = inputMetadata.Dimensions[3];
-        _modelHeight = inputMetadata.Dimensions[2];
-    }
-
-    /// <summary>
     /// 对预处理后的图像张量进行目标检测。
     /// </summary>
     /// <param name="imageTensor">符合模型输入的预处理后张量 [1, 3, H, W]。</param>
     /// <returns>一个只读的边界框列表。</returns>
-    public IReadOnlyList<BoundingBox> GetBoundingBoxes(DenseTensor<float> imageTensor)
+    public ImmutableArray<BoundingBox> GetBoundingBoxes(DenseTensor<float> imageTensor)
     {
+        ObjectDisposedException.ThrowIf(Disposed, this);
+
         var inputs = new List<NamedOnnxValue>
         {
             NamedOnnxValue.CreateFromTensor("images", imageTensor)
         };
 
-        using var results = _session.Run(inputs);
+        using var results = session.Run(inputs);
         var output = results.First().AsTensor<float>();
 
         return Postprocess(output);
@@ -89,8 +86,10 @@ public class YoloV8Predictor : IDisposable
     /// <summary>
     /// 异步对预处理后的图像张量进行目标检测。
     /// </summary>
-    public Task<IReadOnlyList<BoundingBox>> GetBoundingBoxesAsync(DenseTensor<float> imageTensor)
+    public Task<ImmutableArray<BoundingBox>> GetBoundingBoxesAsync(DenseTensor<float> imageTensor)
     {
+        ObjectDisposedException.ThrowIf(Disposed, this);
+
         // ONNX Runtime的Run方法是同步的CPU密集型操作，用Task.Run移到线程池
         return Task.Run(() => GetBoundingBoxes(imageTensor));
     }
@@ -99,78 +98,34 @@ public class YoloV8Predictor : IDisposable
     /// 对原始图像进行目标检测，并返回检测结果和绘制了边框的新图像。
     /// </summary>
     /// <param name="originalImage">要进行检测的原始图像。</param>
+    /// <param name="imageTensor">符合模型输入的预处理后张量 [1, 3, H, W]。</param>
     /// <returns>一个包含边界框列表和绘制了结果的图像的元组。</returns>
-    public (IReadOnlyList<BoundingBox> boxes, Image<Rgba32> annotatedImage) DetectAndDraw(Image<Rgba32> originalImage)
+    public (ImmutableArray<BoundingBox> boxes, Image<Rgb24> annotatedImage) DetectAndDraw(Image<Rgb24> originalImage, DenseTensor<float> imageTensor)
     {
-        var (tensor, ratio, padX, padY) = PreprocessImage(originalImage);
-        var boxes = GetBoundingBoxes(tensor);
+        ObjectDisposedException.ThrowIf(Disposed, this);
 
-        // 将坐标转换回原始图像尺寸
-        var scaledBoxes = new List<BoundingBox>();
-        foreach (var box in boxes)
-        {
-            var x1 = (box.Box.X - padX) / ratio;
-            var y1 = (box.Box.Y - padY) / ratio;
-            var x2 = (box.Box.Right - padX) / ratio;
-            var y2 = (box.Box.Bottom - padY) / ratio;
-            scaledBoxes.Add(new BoundingBox(new RectangleF(x1, y1, x2 - x1, y2 - y1), box.Label, box.Confidence));
-        }
+        var boxes = GetBoundingBoxes(imageTensor);
 
         var annotatedImage = originalImage.Clone(); // 复制图像以进行绘制
-        DrawBoundingBoxes(annotatedImage, scaledBoxes);
+        DrawBoundingBoxes(annotatedImage, boxes, font);
 
-        return (scaledBoxes, annotatedImage);
+        return (boxes.ToImmutableArray(), annotatedImage);
     }
 
     /// <summary>
     /// 异步对原始图像进行目标检测，并返回检测结果和绘制了边框的新图像。
     /// </summary>
-    public Task<(IReadOnlyList<BoundingBox> boxes, Image<Rgba32> annotatedImage)> DetectAndDrawAsync(Image<Rgba32> originalImage)
+    public Task<(ImmutableArray<BoundingBox> boxes, Image<Rgb24> annotatedImage)> DetectAndDrawAsync(Image<Rgb24> originalImage, DenseTensor<float> imageTensor)
     {
-        return Task.Run(() => DetectAndDraw(originalImage));
+        ObjectDisposedException.ThrowIf(Disposed, this);
+
+        return Task.Run(() => DetectAndDraw(originalImage, imageTensor));
     }
 
-    private (DenseTensor<float>, float, float, float) PreprocessImage(Image<Rgba32> image)
-    {
-        float ratio = Math.Min((float)_modelWidth / image.Width, (float)_modelHeight / image.Height);
-        int newWidth = (int)(image.Width * ratio);
-        int newHeight = (int)(image.Height * ratio);
-        float padX = (_modelWidth - newWidth) / 2f;
-        float padY = (_modelHeight - newHeight) / 2f;
 
-        var tempImage = image.Clone(ctx => ctx
-                                       .Resize(new ResizeOptions
-                                        {
-                                            Size = new Size(newWidth, newHeight),
-                                            Mode = ResizeMode.Crop // 使用Crop以保持比例
-                                        }));
+    #region Support methods
 
-        var processedImage = new Image<Rgba32>(_modelWidth, _modelHeight);
-        processedImage.Mutate(ctx =>
-        {
-            ctx.Fill(Color.FromRgb(114, 114, 114)); // Letterbox填充色
-            ctx.DrawImage(tempImage, new Point((int)padX, (int)padY), 1f);
-        });
-
-        var tensor = new DenseTensor<float>(new[] { 1, 3, _modelHeight, _modelWidth });
-        processedImage.ProcessPixelRows(accessor =>
-        {
-            for (int y = 0; y < accessor.Height; y++)
-            {
-                Span<Rgba32> pixelRow = accessor.GetRowSpan(y);
-                for (int x = 0; x < accessor.Width; x++)
-                {
-                    tensor[0, 0, y, x] = pixelRow[x].R / 255.0f;
-                    tensor[0, 1, y, x] = pixelRow[x].G / 255.0f;
-                    tensor[0, 2, y, x] = pixelRow[x].B / 255.0f;
-                }
-            }
-        });
-
-        return (tensor, ratio, padX, padY);
-    }
-
-    private IReadOnlyList<BoundingBox> Postprocess(Tensor<float> output)
+    private ImmutableArray<BoundingBox> Postprocess(Tensor<float> output)
     {
         // YOLOv8的输出是 [1, 84, 8400]。我们需要将其转置为 [1, 8400, 84] 以方便处理
         var transposedOutput = Transpose(output, new[] { 0, 2, 1 });
@@ -201,7 +156,7 @@ public class YoloV8Predictor : IDisposable
                            ));
         }
 
-        return NonMaxSuppression(detections);
+        return NonMaxSuppression(detections).ToImmutableArray();
     }
 
     private List<BoundingBox> NonMaxSuppression(List<BoundingBox> boxes)
@@ -229,7 +184,7 @@ public class YoloV8Predictor : IDisposable
         return (intersection.Width * intersection.Height) / union;
     }
 
-    private static void DrawBoundingBoxes(Image<Rgba32> image, IEnumerable<BoundingBox> boxes)
+    private static void DrawBoundingBoxes(Image<Rgb24> image, IEnumerable<BoundingBox> boxes, Font? font)
     {
         // 字体需要你自己提供或者系统安装，这里仅为示例
         // Font font = SystemFonts.CreateFont("Arial", 12);
@@ -239,8 +194,47 @@ public class YoloV8Predictor : IDisposable
             image.Mutate(ctx =>
             {
                 ctx.Draw(Color.Red, 2, box.Box);
-                // 暂时不画文字，因为字体加载需要额外处理
-                // ctx.DrawText($"{box.Label} {box.Confidence:P2}", font, Color.White, Brushes.Black, new PointF(box.Box.Left, box.Box.Top - 15));
+
+                // 只有在提供了字体时才绘制文本
+                if (font is not null)
+                {
+                    string label = $"{box.Label} {box.Confidence:P2}";
+
+                    // 使用RichTextOptions来控制文本渲染
+                    var textOptions = new RichTextOptions(font)
+                    {
+                        Origin = new PointF(0, 0) // 从原点开始测量
+                    };
+
+                    // 测量文本尺寸，以便绘制背景
+                    FontRectangle measuredSize = TextMeasurer.MeasureBounds(label, textOptions);
+
+                    // 计算文本框的位置（通常在主框的左上角上方）
+                    float textX = box.Box.Left;
+                    float textY = box.Box.Top - measuredSize.Height - 4; // 向上偏移并留出一点边距
+
+                    // 如果文本框会超出图像顶部，则将其移动到主框内部
+                    if (textY < 0)
+                    {
+                        textY = box.Box.Top + 2;
+                    }
+
+                    // 创建文本背景框，并增加一点内边距
+                    var backgroundRect = new RectangleF(
+                        textX,
+                        textY,
+                        measuredSize.Width + 8,
+                        measuredSize.Height + 4
+                    );
+
+                    var textLocation = new PointF(textX + 4, textY + 2);
+
+                    // 绘制文本背景
+                    ctx.Fill(Brushes.Solid(Color.Red), backgroundRect);
+
+                    // 绘制文本
+                    ctx.DrawText(label, font, Color.White, textLocation);
+                }
             });
         }
     }
@@ -248,8 +242,12 @@ public class YoloV8Predictor : IDisposable
     // 辅助方法：转置张量
     private static DenseTensor<float> Transpose(Tensor<float> tensor, int[] permutation)
     {
+        // 1. 计算新张量的维度
         var newShape = permutation.Select(i => tensor.Dimensions[i]).ToArray();
         var newTensor = new DenseTensor<float>(newShape);
+
+        // 2. 计算源张量和目标张量的步长（Strides）
+        // 步长是指在某个维度上移动一个单位，在线性存储中需要跳过的元素数量
         var originalStrides = new int[tensor.Rank];
         originalStrides[tensor.Rank - 1] = 1;
         for (int i = tensor.Rank - 2; i >= 0; i--)
@@ -257,29 +255,46 @@ public class YoloV8Predictor : IDisposable
             originalStrides[i] = originalStrides[i + 1] * tensor.Dimensions[i + 1];
         }
 
+        var newStrides = new int[newTensor.Rank];
+        newStrides[newTensor.Rank - 1] = 1;
+        for (int i = newTensor.Rank - 2; i >= 0; i--)
+        {
+            newStrides[i] = newStrides[i + 1] * newTensor.Dimensions[i + 1];
+        }
+
+        // 3. 遍历源张量的每一个元素
         for (int i = 0; i < tensor.Length; i++)
         {
-            int originalIndex = i;
-            int newIndex = 0;
-            for (int j = tensor.Rank - 1; j >= 0; j--)
+            // 3a. 从线性索引 i 计算出源张量的多维坐标
+            var originalCoords = new int[tensor.Rank];
+            int tempIndex = i;
+            for (int j = 0; j < tensor.Rank; j++)
             {
-                int originalCoord = originalIndex / originalStrides[j];
-                originalIndex %= originalStrides[j];
-
-                int permutedDim = Array.IndexOf(permutation, j);
-                newIndex += originalCoord * (newTensor.Strides[permutedDim]);
+                originalCoords[j] =  tempIndex / originalStrides[j];
+                tempIndex         %= originalStrides[j];
             }
+
+            // 3b. 根据 permutation 计算目标张量中的新多维坐标
+            var newCoords = new int[newTensor.Rank];
+            for (int j = 0; j < newTensor.Rank; j++)
+            {
+                // 新坐标的第 j 维，其值来自于老坐标的第 permutation[j] 维
+                newCoords[j] = originalCoords[permutation[j]];
+            }
+
+            // 3c. 从新的多维坐标计算出目标张量的线性索引
+            int newIndex = 0;
+            for (int j = 0; j < newTensor.Rank; j++)
+            {
+                newIndex += newCoords[j] * newStrides[j];
+            }
+
+            // 3d. 将值从源张量复制到目标张量
             newTensor.SetValue(newIndex, tensor.GetValue(i));
         }
+
         return newTensor;
     }
 
-    public void Dispose()
-    {
-        if (_shouldDisposeSession)
-        {
-            _session.Dispose();
-        }
-        GC.SuppressFinalize(this);
-    }
+    #endregion
 }
