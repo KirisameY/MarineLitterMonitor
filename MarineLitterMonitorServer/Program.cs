@@ -19,19 +19,41 @@ const int height = 480;
 
 
 Console.WriteLine("Hello, world!");
-if (!CameraInteractions.InitializeCamera(width, height))
-{
-    Console.WriteLine("Error: camera initialize failed.");
-    Exit();
-}
-Console.WriteLine("Camera initialized.");
+
+#region cameraInit
+
+CameraInterface cameraInit;
 
 try
 {
+    cameraInit = CameraInterface.GetInstance();
+    cameraInit.SetSize(width, height);
+    if (cameraInit.Size != (width, height))
+    {
+        Console.WriteLine($"Error: camera size is {cameraInit.Size}. (expected: {(width, height)})");
+        Exit();
+        return;
+    }
+}
+catch (CameraInterface.CameraInitializationException)
+{
+    Console.WriteLine("Error: camera initialize failed.");
+    Exit();
+    return;
+}
+
+Console.WriteLine("Camera initialized.");
+
+#endregion
+
+
+try
+{
+    using var camera = cameraInit;
+
     byte[] buffer = new byte[width * height * 3];
     // this takes about 4ms
-    var bytes = CameraInteractions.GetWebcamFrame(buffer, buffer.Length, out int outWidth, out int outHeight, out int channels, false);
-    Console.WriteLine($"out: width = {outWidth}, height = {outHeight}, channels = {channels}");
+    var bytes = camera.GetFrame(buffer, false);
     Console.WriteLine($"read bytes: {bytes}");
 
     var img = Image.LoadPixelData<Bgr24>(buffer, width, height);
@@ -39,6 +61,5 @@ try
 }
 finally
 {
-    CameraInteractions.ReleaseCamera();
     Exit();
 }

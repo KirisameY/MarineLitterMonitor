@@ -5,7 +5,10 @@
 
 extern "C" {
 // 初始化摄像头，返回true表示成功
-bool InitializeCamera(int width, int height);
+bool InitializeCamera(int* width, int* height);
+
+// 设置摄像头的图像尺寸，返回true表示设置成功
+bool SetCameraSize(int width, int height, int* finalWidth, int* finalHeight);
 
 // 获取一帧图像数据，填充到调用者提供的buffer中
 // 返回值为实际写入的字节数，如果失败则返回0

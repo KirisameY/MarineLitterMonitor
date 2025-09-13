@@ -6,10 +6,8 @@
 
 // 使用静态变量，这样摄像头对象在DLL加载期间只初始化一次
 static cv::VideoCapture cap;
-static int frame_width = 0;
-static int frame_height = 0;
 
-bool InitializeCamera(const int width, const int height)
+bool InitializeCamera(int* width, int* height)
 {
     if (cap.isOpened())
     {
@@ -22,20 +20,32 @@ bool InitializeCamera(const int width, const int height)
         std::cerr << "[C++] Error: cap.isOpened() returned false. Failed to open camera." << std::endl;
         return false;
     }
+
+    *width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
+    *height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
+
+    return true;
+}
+
+bool SetCameraSize(const int width, const int height, int* finalWidth, int* finalHeight)
+{
     const auto set_w = cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
     const auto set_h = cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+
+    bool result = true;
     if (!set_w || !set_h)
     {
         std::cout <<
             "[C++] Warning: cap.set() for resolution returned false. The camera may not support this resolution." <<
             std::endl;
+        result = false;
     }
 
-    frame_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
-    frame_height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
-    std::cout << "[C++] Info: Current frame width: " << frame_width << ", height: " << frame_height << "." << std::endl;
+    *finalWidth = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
+    *finalHeight = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
+    std::cout << "[C++] Info: Current frame width: " << finalWidth << ", height: " << finalHeight << "." << std::endl;
 
-    return true;
+    return result;
 }
 
 int GetWebcamFrame(unsigned char* buffer, const int bufferSize,
