@@ -39,7 +39,7 @@ Console.WriteLine("Hello, World!");
 var modelFileInfo = new FileInfo(modelPath);
 
 using var predictor = new YoloV8Predictor(modelPath, labelNames, fontPath);
-predictor.ConfidenceThreshold = 0.03f;
+predictor.ConfidenceThreshold = 0.5f;
 predictor.NmsThreshold        = 0.5f;
 
 foreach (var picturePath in picturePaths)

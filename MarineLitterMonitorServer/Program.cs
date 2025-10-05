@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.Loader;
 
 using MarineLitterMonitor.Server.ExternImport;
 
@@ -13,9 +14,9 @@ using SixLabors.ImageSharp.PixelFormats;
 
 void BeforeExit()
 {
-    Console.WriteLine("Press any key to continue...");
-    Console.ReadKey();
-    Console.WriteLine();
+    // Console.WriteLine("Press any key to continue...");
+    // Console.ReadKey();
+    Console.WriteLine("Program exited.");
 }
 
 const int width = 640;
@@ -49,11 +50,14 @@ const int maxSavFileCount = 64;
 
 
 CancellationTokenSource cancellationTokenSource = new();
-Console.CancelKeyPress += (_, e) =>
+TaskCompletionSource shutdownSource = new();
+AssemblyLoadContext.Default.Unloading += _ =>
 {
-    e.Cancel = true;
-    cancellationTokenSource.Cancel();
-    Console.WriteLine("Cancel requested.");
+    Console.WriteLine("SIGTERM received.");
+    if (!cancellationTokenSource.IsCancellationRequested)
+        cancellationTokenSource.Cancel();
+    // 阻塞 Unloading 事件线程，直到主逻辑清理完毕
+    shutdownSource.Task.Wait();
 };
 
 
@@ -160,5 +164,6 @@ catch (Exception e)
 finally
 {
     BeforeExit();
+    shutdownSource.SetResult();
 }
 return 0;

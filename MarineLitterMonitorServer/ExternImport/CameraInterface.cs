@@ -60,7 +60,8 @@ internal sealed partial class CameraInterface : IDisposable
     #endregion
 
 
-    // Instance Api
+    #region Instance Api
+
     public (int Width, int Height) Size { get; private set; }
 
     public bool SetSize(int width, int height)
@@ -100,6 +101,8 @@ internal sealed partial class CameraInterface : IDisposable
 
         return (outSize, nOutSize);
     }
+
+    #endregion
 
 
     // Exceptions

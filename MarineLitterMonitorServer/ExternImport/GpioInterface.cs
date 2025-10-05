@@ -64,7 +64,8 @@ internal sealed partial class GpioInterface : IDisposable
     #endregion
 
 
-    // Instance Api
+    #region Instance Api
+
     public byte Pin { get; init; }
     public bool IsOutput { get; private set; } = false;
 
@@ -93,6 +94,8 @@ internal sealed partial class GpioInterface : IDisposable
         value = result != 0;
         return true;
     }
+
+    #endregion
 
 
     // Exceptions

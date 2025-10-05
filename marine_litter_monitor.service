@@ -1,0 +1,26 @@
+[Unit]
+Description=Maring Litter Monitor Service
+# 表示在网络准备好之后再启动
+After=network.target
+
+[Service]
+# 清空日志文件
+ExecStartPre=/bin/sh -c 'truncate -s 0 /home/ReEd/Documents/Projects/CourseDesign/MarineLitterMonitor/last.log'
+
+# 脚本的绝对路径
+ExecStart=/home/ReEd/Documents/Projects/CourseDesign/MarineLitterMonitor/start.sh
+
+# 指定工作目录
+WorkingDirectory=/home/ReEd/Documents/Projects/CourseDesign/MarineLitterMonitor
+
+# 重定向到输出流日志文件
+StandardOutput=file:/home/ReEd/Documents/Projects/CourseDesign/MarineLitterMonitor/last.log
+StandardError=file:/home/ReEd/Documents/Projects/CourseDesign/MarineLitterMonitor/last.log
+
+# 如果服务失败，10秒后自动重启
+Restart=on-failure
+RestartSec=10
+
+[Install]
+# 表示这个服务应该在多用户模式下启用
+WantedBy=multi-user.target

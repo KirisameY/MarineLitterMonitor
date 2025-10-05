@@ -11,11 +11,13 @@ using SixLabors.ImageSharp.Drawing.Processing;
 
 namespace MarineLitterMonitorDetection;
 
-public class YoloV8Predictor(InferenceSession session, IEnumerable<string> labels, Font? font = null) : IDisposable
+public class YoloV8Predictor(InferenceSession session, IEnumerable<string> labels, Font? font = null)
+    : IDisposable
 {
     #region Initialize & Dispose
 
-    public YoloV8Predictor(string modelPath, IEnumerable<string> labels, string? fontPath) : this(CreateSession(modelPath), labels, CreateFont(fontPath))
+    public YoloV8Predictor(string modelPath, IEnumerable<string> labels, string? fontPath) :
+        this(CreateSession(modelPath), labels, CreateFont(fontPath))
     {
         _shouldDisposeSession = true;
     }
@@ -48,10 +50,10 @@ public class YoloV8Predictor(InferenceSession session, IEnumerable<string> label
     #endregion
 
 
+    #region Public Api
+
     private readonly ImmutableArray<string> _labels = labels.ToImmutableArray();
     private readonly bool _shouldDisposeSession = false;
-    // private readonly int _modelWidth = session.InputMetadata["images"].Dimensions[3];
-    // private readonly int _modelHeight = session.InputMetadata["images"].Dimensions[2];
 
     /// <summary>
     /// 获取或设置用于过滤检测结果的置信度阈值。
@@ -121,6 +123,8 @@ public class YoloV8Predictor(InferenceSession session, IEnumerable<string> label
 
         return Task.Run(() => DetectAndDraw(originalImage, imageTensor));
     }
+
+    #endregion
 
 
     #region Support methods
