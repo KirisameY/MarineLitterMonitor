@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Loader;
 
+using MarineLitterMonitor.Server;
 using MarineLitterMonitor.Server.ExternImport;
 
 using MarineLitterMonitorDetection;
@@ -63,94 +64,41 @@ AssemblyLoadContext.Default.Unloading += _ =>
 
 Console.WriteLine("Hello, world!");
 
-#region cameraInit
-
-CameraInterface cameraInit;
-
 try
 {
-    cameraInit = CameraInterface.GetInstance();
-    cameraInit.SetSize(width, height);
-    if (cameraInit.Size != (width, height))
-    {
-        Console.WriteLine($"Error: camera size is {cameraInit.Size}. (expected: {(width, height)})");
-        BeforeExit();
-        return 0;
-    }
-}
-catch (CameraInterface.CameraInitializationException)
-{
-    Console.WriteLine("Error: camera initialize failed.");
-    BeforeExit();
-    return 0;
-}
-
-Console.WriteLine("Camera initialized.");
-
-#endregion
-
-
-try
-{
-    using var camera = cameraInit;
-    using var alertGpio = GpioInterface.GetInstance(outputPin);
-
-    byte[] buffer = new byte[width * height * 3];
-    float[] nBuffer = new float[width * height * 3];
-
-    using var predictor = new YoloV8Predictor(modelPath, labelNames, fontPath);
+    var predictor = new YoloV8Predictor(modelPath, labelNames, fontPath);
     predictor.ConfidenceThreshold = 0.5f;
     predictor.NmsThreshold        = 0.5f;
 
-    List<Task> frameTasks = [];
-    while (!cancellationTokenSource.Token.IsCancellationRequested)
+    using var detector = LitterDetector.TryCreateInstance(predictor, width, height, 5000);
+    using var alertGpio = GpioInterface.GetInstance(outputPin);
+
+    if (detector is null) throw new Exception("Detector initialize failed.");
+
+    detector.LitterDetected += (sender, data) =>
     {
-        frameTasks.Clear();
-        frameTasks.Add(Task.Delay(5000, cancellationTokenSource.Token).ContinueWith(t =>
+        DirectoryInfo savDir = new(saveDirPath);
+        if (!savDir.Exists) savDir.Create();
+        var savFiles =
+            savDir.EnumerateFiles()
+                  .Where(file => file.Name.Contains("sav"))
+                  .OrderByDescending(sav => sav.Name)
+                  .ToList();
+        for (int i = savFiles.Count; i > maxSavFileCount - 1; i--)
         {
-            if (t.IsCanceled) return;
-            if (t.IsFaulted) throw t.Exception;
-        }));
-
-        var stopWatch = Stopwatch.StartNew();
-
-        var (bytes, nBytes) = camera.GetFrameAndNormalized(buffer, nBuffer);
-
-        using var img = Image.LoadPixelData<Rgb24>(buffer, width, height);
-        var inputTensor = new DenseTensor<float>(nBuffer.AsMemory(), [1, 3, height, width]);
-        var (result, outImg) = await predictor.DetectAndDrawAsync(img, inputTensor);
-
-        if (result.Length > 0)
-        {
-            DirectoryInfo savDir = new(saveDirPath);
-            if (!savDir.Exists) savDir.Create();
-            var savFiles =
-                savDir.EnumerateFiles()
-                      .Where(file => file.Name.Contains("sav"))
-                      .OrderByDescending(sav => sav.Name)
-                      .ToList();
-            for (int i = savFiles.Count; i > maxSavFileCount - 1; i--)
-            {
-                savFiles[i - 1].Delete();
-            }
-            var filePath = $"{saveDirPath}/sav_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.jpg";
-
-            var savTask = outImg.SaveAsJpegAsync(filePath);
-            frameTasks.Add(savTask);
-
-            var alertTask = Task.Run([SuppressMessage("ReSharper", "AccessToDisposedClosure")] async () =>
-            {
-                alertGpio.Write(true);
-                await Task.Delay(200);
-                alertGpio.Write(false);
-            });
-            frameTasks.Add(alertTask);
+            savFiles[i - 1].Delete();
         }
+        var filePath = $"{saveDirPath}/sav_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.jpg";
 
-        await Task.WhenAll(frameTasks);
-        stopWatch.Stop();
-        Console.WriteLine($"loop used {stopWatch.ElapsedMilliseconds} ms.");
-    }
+        data.OutImage.SaveAsJpeg(filePath);
+
+        Task.Run([SuppressMessage("ReSharper", "AccessToDisposedClosure")] async () =>
+        {
+            alertGpio.Write(true);
+            await Task.Delay(200);
+            alertGpio.Write(false);
+        }).Wait();
+    };
 }
 catch (OperationCanceledException)
 {
@@ -158,8 +106,8 @@ catch (OperationCanceledException)
 }
 catch (Exception e)
 {
-    Console.WriteLine("Unhandled exception found:");
-    Console.WriteLine(e.ToString());
+    Console.Error.WriteLine("Unhandled exception found:");
+    Console.Error.WriteLine(e.ToString());
 }
 finally
 {
