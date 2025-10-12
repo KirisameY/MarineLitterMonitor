@@ -12,7 +12,7 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace MarineLitterMonitor.Server;
 
-internal class LitterDetector : IDisposable
+internal class LitterDetector : IAsyncDisposable
 {
     public event EventHandler<LitterDetectionData>? LitterDetected;
 
@@ -92,9 +92,9 @@ internal class LitterDetector : IDisposable
         return new(camera, predictor, frameWidth, frameHeight, frameTimeMs);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        _cancelTokenSource.Cancel();
-        _task.Wait();
+        await _cancelTokenSource.CancelAsync();
+        await _task;
     }
 }

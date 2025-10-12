@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Loader;
 
@@ -9,10 +8,7 @@ using MarineLitterMonitor.Server.WebServing;
 
 using MarineLitterMonitorDetection;
 
-using Microsoft.ML.OnnxRuntime.Tensors;
-
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 void BeforeExit()
 {
@@ -63,6 +59,12 @@ AssemblyLoadContext.Default.Unloading += _ =>
     // 阻塞 Unloading 事件线程，直到主逻辑清理完毕
     shutdownSource.Task.Wait();
 };
+Console.CancelKeyPress += (_, eventArgs) =>
+{
+    Console.WriteLine("Cancel request received.");
+    cancellationRequestTaskSource.TrySetCanceled();
+    eventArgs.Cancel = true;
+};
 
 
 Console.WriteLine("Hello, world!");
@@ -74,7 +76,7 @@ try
     predictor.ConfidenceThreshold = 0.5f;
     predictor.NmsThreshold        = 0.5f;
 
-    using var detector = LitterDetector.TryCreateInstance(predictor, width, height, 5000);
+    await using var detector = LitterDetector.TryCreateInstance(predictor, width, height, 5000);
     using var alertGpio = GpioInterface.GetInstance(outputPin);
 
     if (detector is null) throw new Exception("Detector initialize failed.");
