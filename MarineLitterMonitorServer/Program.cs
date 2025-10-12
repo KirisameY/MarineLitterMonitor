@@ -5,6 +5,7 @@ using System.Runtime.Loader;
 
 using MarineLitterMonitor.Server;
 using MarineLitterMonitor.Server.ExternImport;
+using MarineLitterMonitor.Server.WebServing;
 
 using MarineLitterMonitorDetection;
 
@@ -50,13 +51,15 @@ const string saveDirPath = "./sav";
 const int maxSavFileCount = 64;
 
 
-CancellationTokenSource cancellationTokenSource = new();
+// CancellationTokenSource cancellationTokenSource = new();
+TaskCompletionSource cancellationRequestTaskSource = new();
 TaskCompletionSource shutdownSource = new();
 AssemblyLoadContext.Default.Unloading += _ =>
 {
     Console.WriteLine("SIGTERM received.");
-    if (!cancellationTokenSource.IsCancellationRequested)
-        cancellationTokenSource.Cancel();
+    // if (!cancellationTokenSource.IsCancellationRequested)
+    //     cancellationTokenSource.Cancel();
+    cancellationRequestTaskSource.TrySetCanceled();
     // 阻塞 Unloading 事件线程，直到主逻辑清理完毕
     shutdownSource.Task.Wait();
 };
@@ -66,6 +69,7 @@ Console.WriteLine("Hello, world!");
 
 try
 {
+    // 初始化检测程序
     var predictor = new YoloV8Predictor(modelPath, labelNames, fontPath);
     predictor.ConfidenceThreshold = 0.5f;
     predictor.NmsThreshold        = 0.5f;
@@ -75,7 +79,7 @@ try
 
     if (detector is null) throw new Exception("Detector initialize failed.");
 
-    detector.LitterDetected += (sender, data) =>
+    detector.LitterDetected += (_, data) =>
     {
         DirectoryInfo savDir = new(saveDirPath);
         if (!savDir.Exists) savDir.Create();
@@ -99,6 +103,12 @@ try
             alertGpio.Write(false);
         }).Wait();
     };
+
+    // 初始化网络服务
+    await using var webServer = await WebServer.StartAsync();
+
+    // 阻塞程序直到结束运行
+    await cancellationRequestTaskSource.Task;
 }
 catch (OperationCanceledException)
 {
