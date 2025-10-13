@@ -1,11 +1,4 @@
-﻿using Carter;
-
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-
-namespace MarineLitterMonitor.Server.WebServing;
+﻿namespace MarineLitterMonitor.Server.WebServing;
 
 internal class WebServer : IAsyncDisposable
 {
@@ -23,10 +16,12 @@ internal class WebServer : IAsyncDisposable
         builder.Services.Configure<ConsoleLifetimeOptions>(opts => opts.SuppressStatusMessages = true);
         // 设置监听地址
         builder.WebHost.UseUrls("http://*:80");
-        builder.Services.AddCarter();
 
         var app = builder.Build();
-        app.MapCarter();
+        app.MapGet("/test/{name}/{location}", (string name, string location) =>
+        {
+            return $"你好, 来自 {location} 的 {name}！";
+        });
 
         await app.StartAsync();
         Console.WriteLine("Web Server started!");
