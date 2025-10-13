@@ -4,6 +4,7 @@ using System.Runtime.Loader;
 
 using MarineLitterMonitor.Server;
 using MarineLitterMonitor.Server.ExternImport;
+using MarineLitterMonitor.Server.FileRecording;
 using MarineLitterMonitor.Server.WebServing;
 
 using MarineLitterMonitorDetection;
@@ -43,8 +44,9 @@ ImmutableArray<string> labelNames =
 
 const string fontPath = "consola.ttf";
 
-const string saveDirPath = "./sav";
-const int maxSavFileCount = 64;
+const string recordSaveDirPath = "./record/logs";
+const string imageSaveDirPath = "./record/images";
+const int maxImageFileCount = 64;
 
 
 // CancellationTokenSource cancellationTokenSource = new();
@@ -71,39 +73,33 @@ Console.WriteLine("Hello, world!");
 
 try
 {
-    // 初始化检测程序
+    // 初始化IO模块
+    using var recordManager = new RecordManager(recordSaveDirPath, imageSaveDirPath, maxImageFileCount);
+
+    // 初始化GPIO
+    using var alertGpio = GpioInterface.GetInstance(outputPin);
+
+    // 初始化检测程序 & 注册检测通知
     var predictor = new YoloV8Predictor(modelPath, labelNames, fontPath);
     predictor.ConfidenceThreshold = 0.5f;
     predictor.NmsThreshold        = 0.5f;
 
     await using var detector = LitterDetector.TryCreateInstance(predictor, width, height, 5000);
-    using var alertGpio = GpioInterface.GetInstance(outputPin);
 
     if (detector is null) throw new Exception("Detector initialize failed.");
 
     detector.LitterDetected += (_, data) =>
     {
-        DirectoryInfo savDir = new(saveDirPath);
-        if (!savDir.Exists) savDir.Create();
-        var savFiles =
-            savDir.EnumerateFiles()
-                  .Where(file => file.Name.Contains("sav"))
-                  .OrderByDescending(sav => sav.Name)
-                  .ToList();
-        for (int i = savFiles.Count; i > maxSavFileCount - 1; i--)
-        {
-            savFiles[i - 1].Delete();
-        }
-        var filePath = $"{saveDirPath}/sav_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.jpg";
-
-        data.OutImage.SaveAsJpeg(filePath);
-
-        Task.Run([SuppressMessage("ReSharper", "AccessToDisposedClosure")] async () =>
+        // ReSharper disable once AccessToDisposedClosure
+        var tSav = Task.Run(() => recordManager.Write(data));
+        var tAlt = Task.Run([SuppressMessage("ReSharper", "AccessToDisposedClosure")] async () =>
         {
             alertGpio.Write(true);
             await Task.Delay(200);
             alertGpio.Write(false);
-        }).Wait();
+        });
+
+        Task.WaitAll(tSav, tAlt);
     };
 
     // 初始化网络服务
