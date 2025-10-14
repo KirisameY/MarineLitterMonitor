@@ -37,7 +37,8 @@ internal class WebServer : IAsyncDisposable
 
         List<IWebModule> modules =
         [
-            new IndexModule("/index"),
+            new IndexModule("/index", "/logs", "/pics"),
+            new LogModule("/logs", recordManager),
         ];
 
         modules.ForEach(m => m.Map(app));
