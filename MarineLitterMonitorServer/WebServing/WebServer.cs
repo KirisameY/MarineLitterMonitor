@@ -33,7 +33,13 @@ internal class WebServer : IAsyncDisposable
             return Results.Redirect("/test/%E5%8F%B2%E5%90%9B/%E9%85%B1%E6%B5%B7%E5%B8%A6"); // 史君/酱海带
         });
 
-        app.MapGet("/", () => Results.Redirect("/index"));
+        List<IWebModule> modules =
+        [
+            new IndexModule("/index"),
+        ];
+
+        modules.ForEach(m => m.Map(app));
+
         app.MapFallback(() => Results.NotFound("Error 404: 未识别的URL"));
         await app.StartAsync();
         Console.WriteLine("Web Server started!");

@@ -135,7 +135,6 @@ public sealed partial class RecordManager(string logPath, string picPath, uint m
 
     public IEnumerable<(DateTime, Image<Rgb24>)> ReadPics()
     {
-        (string, byte[])[] pics;
         lock (_picFileLock)
         {
             DirectoryInfo picDir = new(picPath);
