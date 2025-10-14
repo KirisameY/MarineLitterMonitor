@@ -1,5 +1,7 @@
 ﻿using System.Net;
 
+using MarineLitterMonitor.Server.FileRecording;
+
 namespace MarineLitterMonitor.Server.WebServing;
 
 internal class WebServer : IAsyncDisposable
@@ -11,7 +13,7 @@ internal class WebServer : IAsyncDisposable
 
     private readonly WebApplication _app;
 
-    public static async Task<WebServer> StartAsync()
+    public static async Task<WebServer> StartAsync(RecordManager recordManager)
     {
         var builder = WebApplication.CreateBuilder();
         // 不处理中止请求

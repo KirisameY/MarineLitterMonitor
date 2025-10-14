@@ -103,7 +103,7 @@ try
     };
 
     // 初始化网络服务
-    await using var webServer = await WebServer.StartAsync();
+    await using var webServer = await WebServer.StartAsync(recordManager);
 
     // 阻塞程序直到结束运行
     await cancellationRequestTaskSource.Task;
