@@ -107,6 +107,16 @@ public sealed partial class RecordManager(string logPath, string picPath, uint m
                    .ToImmutableList();
     }
 
+    public byte[]? ReadPic(DateTime time)
+    {
+        var filePath = $"{picPath}/sav_{time:yyyy-MM-dd_HH-mm-ss}.jpg";
+        lock (_picFileLock) // 图像文件检查和操作，上锁
+        {
+            return !File.Exists(filePath) ? null : File.ReadAllBytes(filePath);
+        }
+    }
+
+
     [GeneratedRegex(@"^log_(?<t>\d{4}_\d{2}_\d{2})\.record$", RegexOptions.Singleline)]
     private static partial Regex LogNameRegex { get; }
 
@@ -133,29 +143,29 @@ public sealed partial class RecordManager(string logPath, string picPath, uint m
         }
     }
 
-    public IEnumerable<(DateTime, Image<Rgb24>)> ReadPics()
+    public IEnumerable<DateTime> ReadPics()
     {
+        string[] picInfos;
         lock (_picFileLock)
         {
             DirectoryInfo picDir = new(picPath);
-            var picInfos = picDir.EnumerateFiles()
-                                 .Select(f => (f.FullName, Match: PicNameRegex.Match(f.Name)))
-                                 .Where(t => t.Match.Success)
-                                 .Select(t => (t.Match.Groups["t"].Value, File.ReadAllBytes(t.FullName)));
-            return picInfos.Select(t =>
-            {
-                var (tim, picBytes) = t;
-                if (tim.Split('_') is not [var date, var time] ||
-                    date.Split('-') is not [var y, var mon, var d] ||
-                    time.Split('-') is not [var h, var min, var s])
-                {
-                    throw new Exception("log name date is not 'yyyy-MM-dd_HH-mm-ss', this should not happen");
-                }
-                var dateOnly = new DateOnly(int.Parse(y), int.Parse(mon), int.Parse(d));
-                var timeOnly = new TimeOnly(int.Parse(h), int.Parse(min), int.Parse(s));
-                var pic = Image.Load<Rgb24>(picBytes);
-                return (new DateTime(dateOnly, timeOnly), pic);
-            }).ToArray();
+            picInfos = picDir.EnumerateFiles()
+                             .Select(f => PicNameRegex.Match(f.Name))
+                             .Where(m => m.Success)
+                             .Select(m => m.Groups["t"].Value)
+                             .ToArray();
         }
+        return picInfos.Select(t =>
+        {
+            if (t.Split('_') is not [var date, var time] ||
+                date.Split('-') is not [var y, var mon, var d] ||
+                time.Split('-') is not [var h, var min, var s])
+            {
+                throw new Exception("log name date is not 'yyyy-MM-dd_HH-mm-ss', this should not happen");
+            }
+            var dateOnly = new DateOnly(int.Parse(y), int.Parse(mon), int.Parse(d));
+            var timeOnly = new TimeOnly(int.Parse(h), int.Parse(min), int.Parse(s));
+            return new DateTime(dateOnly, timeOnly);
+        });
     }
 }

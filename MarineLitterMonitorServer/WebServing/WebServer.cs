@@ -39,6 +39,7 @@ internal class WebServer : IAsyncDisposable
         [
             new IndexModule("/index", "/logs", "/pics"),
             new LogModule("/logs", recordManager),
+            new PicModule("/pics", recordManager),
         ];
 
         modules.ForEach(m => m.Map(app));

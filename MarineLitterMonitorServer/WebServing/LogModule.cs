@@ -8,11 +8,10 @@ internal class LogModule(string uri, RecordManager recordManager) : IWebModule
     {
         var group = app.MapGroup(uri);
         group.MapGet("/", () => Results.Content(GenerateIndexPage(), "text/html"));
-        group.MapGet(@"{date:regex(^\d{{4}}_\d{{2}}_\d{{2}}$)}", (string date) =>
+        group.MapGet(@"/{date:regex(^\d{{4}}_\d{{2}}_\d{{2}}$)}", (string date) =>
         {
-            if (DateOnly.TryParseExact(date, "yyyy_MM_dd", out DateOnly dateOnly))
-                return Results.Content(GenerateDayLogPage(dateOnly), "text/html");
-            return Results.Redirect(uri);
+            var dateOnly = DateOnly.ParseExact(date, "yyyy_MM_dd");
+            return Results.Content(GenerateDayLogPage(dateOnly), "text/html");
         });
         group.MapFallback(() => Results.Redirect(uri));
     }
