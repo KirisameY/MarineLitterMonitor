@@ -18,7 +18,7 @@ internal class LogModule(string uri, RecordManager recordManager) : IWebModule
 
     private string GenerateIndexPage()
     {
-        var logDates = recordManager.ReadLogs().ToArray();
+        var logDates = recordManager.ReadLogs().OrderDescending().ToArray();
 
         var builder = new TagStringBuilder();
         using (builder.IndentTag("html", "lang=\"zh\""))
