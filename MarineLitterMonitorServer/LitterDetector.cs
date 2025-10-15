@@ -17,6 +17,7 @@ internal class LitterDetector : IAsyncDisposable
     public event EventHandler<LitterDetectionData>? LitterDetected;
 
     private readonly CancellationTokenSource _cancelTokenSource = new();
+    private readonly TaskCompletionSource _startSource = new();
     private readonly Task _task;
 
     private LitterDetector(CameraInterface cameraIn, YoloV8Predictor predictorIn, ushort frameWidth, ushort frameHeight, uint frameTimeMs)
@@ -30,11 +31,14 @@ internal class LitterDetector : IAsyncDisposable
             byte[] buffer = new byte[frameWidth * frameHeight * 3];
             float[] nBuffer = new float[frameWidth * frameHeight * 3];
 
+            await _startSource.Task;
+            Console.WriteLine("Detection loop started!");
+
             var cancelToken = _cancelTokenSource.Token;
             while (!cancelToken.IsCancellationRequested)
             {
                 frameTasks.Clear();
-                frameTasks.Add(Task.Delay(5000, cancelToken).ContinueWith(t =>
+                frameTasks.Add(Task.Delay((int)frameTimeMs, cancelToken).ContinueWith(t =>
                 {
                     if (t.IsCanceled) return;
                     if (t.IsFaulted) throw t.Exception;
@@ -90,6 +94,11 @@ internal class LitterDetector : IAsyncDisposable
         Console.WriteLine("Camera initialized.");
 
         return new(camera, predictor, frameWidth, frameHeight, frameTimeMs);
+    }
+
+    public void Start()
+    {
+        _startSource.TrySetResult();
     }
 
     public async ValueTask DisposeAsync()
