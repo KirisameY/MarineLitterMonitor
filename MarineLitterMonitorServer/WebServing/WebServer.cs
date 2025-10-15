@@ -22,18 +22,6 @@ internal class WebServer : IAsyncDisposable
         builder.WebHost.UseUrls("http://*:80");
 
         var app = builder.Build();
-        app.MapGet("/test/{name}/{location}", (string name, string location) =>
-        {
-            return $"你好, 来自 {location} 的 {name}！";
-        });
-        app.MapGet("/test/{name}", (string name) =>
-        {
-            return Results.Redirect($"/test/{WebUtility.UrlEncode(name)}/%E9%85%B1%E6%B5%B7%E5%B8%A6"); // 酱海带
-        });
-        app.MapGet("/test", () =>
-        {
-            return Results.Redirect("/test/%E5%8F%B2%E5%90%9B/%E9%85%B1%E6%B5%B7%E5%B8%A6"); // 史君/酱海带
-        });
 
         List<IWebModule> modules =
         [
