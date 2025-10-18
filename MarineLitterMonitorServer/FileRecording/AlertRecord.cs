@@ -4,7 +4,7 @@ using MarineLitterMonitorDetection;
 
 namespace MarineLitterMonitor.Server.FileRecording;
 
-public record struct AlertRecord(TimeOnly Time, ImmutableArray<AlertRecordEntry> Entries)
+public readonly record struct AlertRecord(TimeOnly Time, ImmutableArray<AlertRecordEntry> Entries)
 {
     public static AlertRecord FromBoundingBoxes(IEnumerable<BoundingBox> boxes, DateTime time) =>
         FromBoundingBoxes(boxes, TimeOnly.FromDateTime(time));
@@ -16,7 +16,7 @@ public record struct AlertRecord(TimeOnly Time, ImmutableArray<AlertRecordEntry>
     }
 }
 
-public record struct AlertRecordEntry(string Label, float Confidence)
+public readonly record struct AlertRecordEntry(string Label, float Confidence)
 {
     public static AlertRecordEntry FromBoundingBox(BoundingBox box) => new(box.Label, box.Confidence);
 }
